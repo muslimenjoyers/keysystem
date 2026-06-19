@@ -27,10 +27,10 @@ local Config = {
     
     -- [4] Social Media Settings (Set to true to show, false to hide)
     ShowDiscord     = false,
-    DiscordURL      = "https://discord.gg/",
+    DiscordURL      = "https://discord.gg/kT55J724BK",
     
     ShowInstagram   = false,
-    InstagramURL    = "https://www.instagram.com/",
+    InstagramURL    = "https://www.instagram.com/oyb0i/",
     
     ShowYoutube     = false,
     YoutubeURL      = "https://youtube.com/@vvipmods-official?si=Jzp6hfSVZq5xITPm",

@@ -2,7 +2,7 @@
     ================================================================
     [ SCRIPT INFORMATION ]
     Project: Custom Script
-    Author: VVIPMODS
+    Author: OYB
     YouTube: https://youtube.com/@vvipmods-official?si=Jzp6hfSVZq5xITPm
     
     [ TERMS AND CONDITIONS ]
@@ -11,7 +11,7 @@
       ownership of this script.
     - Removing or altering these credits is strictly prohibited.
     
-    Copyright (c) 2026 VVIPMODS. All rights reserved.
+    Copyright (c) 2026 OYB. All rights reserved.
     ================================================================
 ]]
 local Config = {

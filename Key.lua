@@ -43,7 +43,7 @@ local Config = {
     MainGuiName     = "anything", -- Name of the main script's GUI to check if it's already executing
 
     -- [7] Hub Information & UI Text
-    HubName         = "VVIP MODS", -- The main title shown at the top of the GUI
+    HubName         = "VVIPMODS", -- The main title shown at the top of the GUI
     HubDescription  = "LIKE AND SUBSCRIBE" -- The text shown below the title
 }
 

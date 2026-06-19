@@ -44,7 +44,7 @@ local Config = {
 
     -- [7] Hub Information & UI Text
     HubName         = "VVIPMODS", -- The main title shown at the top of the GUI
-    HubDescription  = "LIKE AND SUBSCRIBE" -- The text shown below the title
+    HubDescription  = "MASUKKAN KEY" -- The text shown below the title
 }
 
 -------------------------------------------------------------------------------

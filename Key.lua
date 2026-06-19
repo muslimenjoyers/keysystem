@@ -3,7 +3,7 @@
     [ SCRIPT INFORMATION ]
     Project: Custom Script
     Author: OYB
-    YouTube: https://youtube.com/@vvipmods-official?si=Jzp6hfSVZq5xITPm
+    YouTube: https://www.youtube.com/channel/UCAlXXV1Hbvf7WbfXARuVtiQ
     
     [ TERMS AND CONDITIONS ]
     - You ARE allowed to use and modify this script for your own games.
@@ -33,7 +33,7 @@ local Config = {
     InstagramURL    = "https://www.instagram.com/oyb0i/",
     
     ShowYoutube     = false,
-    YoutubeURL      = "https://youtube.com/@vvipmods-official?si=Jzp6hfSVZq5xITPm",
+    YoutubeURL      = "https://www.youtube.com/channel/UCAlXXV1Hbvf7WbfXARuVtiQ",
 
     -- [5] File System
     KeyFileName     = "Mykey.txt", -- The name of the file where the valid key will be saved for auto-login

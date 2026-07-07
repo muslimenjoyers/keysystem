@@ -168,10 +168,10 @@ local function CreateGUI()
     local coreGui = game:GetService("CoreGui")
     local targetParent = pcall(function() return coreGui end) and coreGui or player:WaitForChild("PlayerGui")
     
-    if targetParent:FindFirstChild("OYB_KeySystem") then targetParent.OYB_KeySystem:Destroy() end
+    if targetParent:FindFirstChild("VVIPMODS_KeySystem") then targetParent.VVIPMODS_KeySystem:Destroy() end
 
     local ScreenGui = Instance.new("ScreenGui", targetParent)
-    ScreenGui.Name = "OYB_KeySystem"
+    ScreenGui.Name = "VVIPMODS_KeySystem"
     ScreenGui.ResetOnSpawn = false
 
     local MainFrame = Instance.new("Frame", ScreenGui)

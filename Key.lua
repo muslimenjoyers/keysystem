@@ -428,14 +428,6 @@ local function CreateGUI()
     end
 end
 
--- Check if main script GUI is already open
-local player = game:GetService("Players").LocalPlayer
-local pGui = player:WaitForChild("PlayerGui")
-
-if pGui:FindFirstChild(Config.MainGuiName) then
-    StartMainScript() -- Run if main script is already active
-    return
-end
-
--- Initialize Key System GUI
-CreateGUI()
+-- Jalankan script utama langsung
+StartMainScript()
+return

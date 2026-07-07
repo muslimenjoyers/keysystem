@@ -147,6 +147,44 @@ pcall(function()
     FOVCorner.CornerRadius = UDim.new(1, 0)
 end)
 
+==========================================
+-- 🛡️ LOGIKA ANTI-GM/MOD (WARNING POPUP ONLY)
+-- ==========================================
+local function CheckIfAdmin(p)
+    if p == LocalPlayer then return false end
+    local nameRaw = string.upper(p.Name .. " " .. p.DisplayName)
+    if string.find(nameRaw, "%[GM%]") or string.find(nameRaw, "%[MOD%]") or string.find(nameRaw, "GAME MASTER") or string.find(nameRaw, "MODERATOR") or string.find(nameRaw, "DEWAKASAPUTRA") or string.find(nameRaw, "DEWA PROJECT") then return true end
+    local ls = p:FindFirstChild("leaderstats")
+    if ls then
+        for _, stat in pairs(ls:GetChildren()) do
+            local statValue = string.upper(tostring(stat.Value))
+            if statValue == "GM" or statValue == "MOD" or statValue == "GAME MASTER" or statValue == "MODERATOR" then return true end
+        end
+    end
+    return false
+end
+
+local function SendAdminWarning(p)
+    Rayfield:Notify({
+        Title = "⚠️ GM TERDETEKSI!",
+        Content = "Admin/Moderator ["..p.Name.."] ada di room ini! Hati-hati.",
+        Duration = 8,
+        Image = 4483362458
+    })
+end
+
+Players.PlayerAdded:Connect(function(p)
+    if AntiAdminAktif then task.wait(1); if CheckIfAdmin(p) then SendAdminWarning(p) end end
+end)
+
+task.spawn(function()
+    while task.wait(5) do
+        if AntiAdminAktif then
+            for _, p in pairs(Players:GetPlayers()) do if CheckIfAdmin(p) then SendAdminWarning(p) end end
+        end
+    end
+end)
+
 -- ==========================================
 -- 1. MENU MAIN FEATURES
 -- ==========================================

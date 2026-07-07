@@ -1059,7 +1059,7 @@ LoginTab:CreateDivider()
 
 LoginTab:CreateInput({
     Name = "Masukkan Key",
-    PlaceholderText = "Contoh: VVIP2025",
+    PlaceholderText = "Contoh: RBLX-123",
     RemoveTextAfterFocusLost = false,
     Ext = true, -- Layout label di atas, form di bawah (full width)
     Callback = function(Text)

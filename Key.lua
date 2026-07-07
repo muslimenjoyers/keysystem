@@ -2,8 +2,8 @@
     ================================================================
     [ SCRIPT INFORMATION ]
     Project: Custom Script
-    Author: OYB
-    YouTube: https://www.youtube.com/channel/UCAlXXV1Hbvf7WbfXARuVtiQ
+    Author: VVIPMODS
+    YouTube: https://youtube.com/@vvipmods-official?si=di1WzKXZ8QIEM-5i
     
     [ TERMS AND CONDITIONS ]
     - You ARE allowed to use and modify this script for your own games.
@@ -11,7 +11,7 @@
       ownership of this script.
     - Removing or altering these credits is strictly prohibited.
     
-    Copyright (c) 2026 OYB. All rights reserved.
+    Copyright (c) 2026 VVIPMODS. All rights reserved.
     ================================================================
 ]]
 local Config = {
@@ -27,13 +27,13 @@ local Config = {
     
     -- [4] Social Media Settings (Set to true to show, false to hide)
     ShowDiscord     = false,
-    DiscordURL      = "https://discord.gg/kT55J724BK",
+    DiscordURL      = "https://discord.gg/",
     
     ShowInstagram   = false,
-    InstagramURL    = "https://www.instagram.com/oyb0i/",
+    InstagramURL    = "https://Instagram.com/",
     
     ShowYoutube     = false,
-    YoutubeURL      = "https://www.youtube.com/channel/UCAlXXV1Hbvf7WbfXARuVtiQ",
+    YoutubeURL      = "https://youtube.com/@vvipmods-official?si=di1WzKXZ8QIEM-5i",
 
     -- [5] File System
     KeyFileName     = "Mykey.txt", -- The name of the file where the valid key will be saved for auto-login

@@ -586,7 +586,12 @@ local AimbotMode = "POV Kamera (FOV)"
 local AimTargetMode = "Head" 
 local AimbotSmoothness = 15
 
-local ESPAktif = false
+local ESPChamsAktif = false -- // GANTI: DULU ESPBoxAktif
+local ESPBoxAktif = false -- // TAMBAH
+local ESPNamaAktif = false -- // TETAP
+local ESP_Drawings = {} -- // TAMBAH: UNTUK DRAWING BOX
+local ESPTracerAktif = false -- // TAMBAH INI
+local ESPHealthAktif = false -- // TAMBAH INI
 local FFAModeAktif = false
 local SpeedAktif, JumpAktif = false, false
 local AntiFallDamageAktif = false
@@ -681,7 +686,11 @@ Dropdowns.AimTarget = MainTab:CreateDropdown({ Name = "🎯 Target Bagian Tubuh"
 Sliders.Smoothness = MainTab:CreateSlider({ Name = "🧲 Kelengketan Aim POV (Smoothness)", Range = {1, 100}, Increment = 1, Suffix = "%", CurrentValue = 15, Flag = "SmoothSlider", Callback = function(Value) AimbotSmoothness = Value end })
 Toggles.FOV = MainTab:CreateToggle({ Name = "⭕ Tampilkan Lingkaran FOV", CurrentValue = false, Flag = "FOVTOGGLE", Callback = function(Value) ShowFOV = Value end })
 Sliders.FOV = MainTab:CreateSlider({ Name = "📏 Lebar Lingkaran FOV", Range = {10, 600}, Increment = 5, Suffix = " Px", CurrentValue = 150, Flag = "FOVSlider", Callback = function(Value) FOVRadius = Value end })
-Toggles.ESP = MainTab:CreateToggle({ Name = "👁️ Enemy ESP (Melihat Musuh)", CurrentValue = false, Flag = "ESPToggle", Callback = function(Value) ESPAktif = Value end })
+Toggles.ESPChams = MainTab:CreateToggle({ Name = "🔴 WALLHACK RED", CurrentValue = false, Flag = "ESPChamsToggle", Callback = function(Value) ESPChamsAktif = Value end })
+Toggles.ESPBox = MainTab:CreateToggle({ Name = "⬜ ESP BOX", CurrentValue = false, Flag = "ESPBoxToggle", Callback = function(Value) ESPBoxAktif = Value end })
+Toggles.ESPNama = MainTab:CreateToggle({ Name = "📝 ESP NAMA + DISTANCE", CurrentValue = false, Flag = "ESPNamaToggle", Callback = function(Value) ESPNamaAktif = Value end })
+Toggles.ESPTracer = MainTab:CreateToggle({ Name = "📍 ESP LINE", CurrentValue = false, Flag = "ESPTracerToggle", Callback = function(Value) ESPTracerAktif = Value end }) -- // TAMBAH INI
+Toggles.ESPHealth = MainTab:CreateToggle({ Name = "❤️ ESP HEALTH Bar", CurrentValue = false, Flag = "ESPHealthToggle", Callback = function(Value) ESPHealthAktif = Value end }) -- // TAMBAH INI
 
 -- ==========================================
 -- 2. MENU PLAYER HACKS
@@ -706,7 +715,12 @@ local ConfigFileName = "LiteHack_Config.json"
 local function SaveSettings()
     local settings = {
         AntiAdmin = AntiAdminAktif, Aimbot = AimbotAktif, AimbotMode = AimbotMode, AimTargetMode = AimTargetMode,
-        AimbotSmoothness = AimbotSmoothness, ShowFOV = ShowFOV, FOVRadius = FOVRadius, ESPAktif = ESPAktif,
+        AimbotSmoothness = AimbotSmoothness, ShowFOV = ShowFOV, FOVRadius = FOVRadius,
+        ESPChamsAktif = ESPChamsAktif, -- // GANTI
+        ESPBoxAktif = ESPBoxAktif, -- // TAMBAH
+        ESPNamaAktif = ESPNamaAktif, -- // TETAP
+        ESPTracerAktif = ESPTracerAktif, -- // TAMBAH INI
+        ESPHealthAktif = ESPHealthAktif, -- // TAMBAH INI
         AntiFallDamageAktif = AntiFallDamageAktif, SpeedAktif = SpeedAktif, CustomSpeed = CustomSpeed,
         JumpAktif = JumpAktif, CustomJump = CustomJump, GunModsAktif = GunModsAktif, CustomFireRate = CustomFireRate
     }
@@ -733,7 +747,11 @@ local function LoadSettings()
             if settings.AimbotSmoothness ~= nil then Sliders.Smoothness:Set(settings.AimbotSmoothness) end
             if settings.ShowFOV ~= nil then Toggles.FOV:Set(settings.ShowFOV) end
             if settings.FOVRadius ~= nil then Sliders.FOV:Set(settings.FOVRadius) end
-            if settings.ESPAktif ~= nil then Toggles.ESP:Set(settings.ESPAktif) end
+            if settings.ESPChamsAktif ~= nil then Toggles.ESPChams:Set(settings.ESPChamsAktif) end -- // GANTI
+            if settings.ESPBoxAktif ~= nil then Toggles.ESPBox:Set(settings.ESPBoxAktif) end -- // TAMBAH
+            if settings.ESPNamaAktif ~= nil then Toggles.ESPNama:Set(settings.ESPNamaAktif) end -- // TETAP
+            if settings.ESPTracerAktif ~= nil then Toggles.ESPTracer:Set(settings.ESPTracerAktif) end -- // TAMBAH INI
+            if settings.ESPHealthAktif ~= nil then Toggles.ESPHealth:Set(settings.ESPHealthAktif) end -- // TAMBAH INI
             if settings.AntiFallDamageAktif ~= nil then Toggles.AntiFall:Set(settings.AntiFallDamageAktif) end
             if settings.SpeedAktif ~= nil then Toggles.Speed:Set(settings.SpeedAktif) end
             if settings.CustomSpeed ~= nil then Sliders.Speed:Set(settings.CustomSpeed) end
@@ -774,7 +792,11 @@ ConfigTab:CreateButton({
         Sliders.Smoothness:Set(15)
         Toggles.FOV:Set(false)
         Sliders.FOV:Set(150)
-        Toggles.ESP:Set(false)
+        Toggles.ESPChams:Set(false) -- // GANTI
+        Toggles.ESPBox:Set(false) -- // TAMBAH
+        Toggles.ESPNama:Set(false) -- // TETAP
+        Toggles.ESPTracer:Set(false) -- // TAMBAH INI
+        Toggles.ESPHealth:Set(false) -- // TAMBAH INI
         Toggles.AntiFall:Set(false)
         Toggles.Speed:Set(false)
         Sliders.Speed:Set(50)
@@ -808,7 +830,7 @@ local function IsEnemy(model)
 end
 
 -- ==========================================
--- 👁️ LOGIKA ESP (ORIGINAL)
+-- 👁️ LOGIKA ESP (SUDAH FIX + TRACER + HEALTH)
 -- ==========================================
 local CoreGui = game:GetService("CoreGui")
 local ESP_Folder = CoreGui:FindFirstChild("Universal_ESP_System") or Instance.new("Folder")
@@ -817,19 +839,19 @@ ESP_Folder.Parent = CoreGui
 local Active_ESP = {}
 
 RunService.RenderStepped:Connect(function()
-    if not ESPAktif then
-        for _, data in pairs(Active_ESP) do
-            data.Highlight.Enabled = false
-            data.Gui.Enabled = false
-        end
+    if not ESPChamsAktif and not ESPBoxAktif and not ESPNamaAktif and not ESPTracerAktif and not ESPHealthAktif then
+        for _, data in pairs(Active_ESP) do data.Highlight.Enabled = false data.Gui.Enabled = false end
+        for _, data in pairs(ESP_Drawings) do data.Box.Visible = false data.Line.Visible = false data.Health.Visible = false end
         return
     end
+
     local EntitiesInFrame = {}
     for _, model in pairs(ValidEntities) do
         local hum = model:FindFirstChildOfClass("Humanoid")
         local hrp = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Head") or model.PrimaryPart
         if model.Parent and hum and hum.Health > 0 and hrp and IsEnemy(model) then
             EntitiesInFrame[model] = true
+
             if not Active_ESP[model] then
                 local esp_data = {}
                 local hl = Instance.new("Highlight")
@@ -846,7 +868,7 @@ RunService.RenderStepped:Connect(function()
                 bgui.Adornee = hrp
                 bgui.AlwaysOnTop = true
                 bgui.Size = UDim2.new(0, 200, 0, 50)
-                bgui.ExtentsOffset = Vector3.new(0, 3, 0)
+                bgui.ExtentsOffset = Vector3.new(0, 6, 0)
                 bgui.Parent = ESP_Folder
                 esp_data.Gui = bgui
 
@@ -859,28 +881,78 @@ RunService.RenderStepped:Connect(function()
                 txt.TextColor3 = Color3.fromRGB(255, 255, 255)
                 txt.Parent = bgui
                 esp_data.TextLabel = txt
-
                 Active_ESP[model] = esp_data
             end
 
+            if not ESP_Drawings[model] then
+                ESP_Drawings[model] = {
+                    Box = CreateDrawingBox(),
+                    Line = CreateDrawingLine(),
+                    Health = CreateDrawingHealth()
+                }
+            end
+
             local data = Active_ESP[model]
-            data.Highlight.Enabled = true
-            data.Gui.Enabled = true
+            local draw = ESP_Drawings[model]
+
+            data.Highlight.Enabled = ESPChamsAktif
+            data.Gui.Enabled = ESPNamaAktif
+            draw.Box.Visible = ESPBoxAktif
+            draw.Line.Visible = ESPTracerAktif
+            draw.Health.Visible = ESPHealthAktif
 
             local jarak = 0
             if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
                 jarak = math.floor((LocalPlayer.Character.HumanoidRootPart.Position - hrp.Position).Magnitude)
             end
-
             local isShielded = model:FindFirstChildOfClass("ForceField")
-            if isShielded then
-                data.Highlight.FillColor = Color3.fromRGB(0, 0, 255)
-            else
-                data.Highlight.FillColor = Color3.fromRGB(255, 0, 0)
+            local color = isShielded and Color3.fromRGB(0, 0, 255) or Color3.fromRGB(255, 0, 0)
+
+            if ESPChamsAktif then data.Highlight.FillColor = color end
+
+            if ESPBoxAktif or ESPTracerAktif or ESPHealthAktif then
+                local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                if onScreen then
+                    local topWorld = (hrp.CFrame * CFrame.new(0, 3, 0)).Position
+                    local bottomWorld = (hrp.CFrame * CFrame.new(0, -3.5, 0)).Position
+                    local top2D = Camera:WorldToViewportPoint(topWorld)
+                    local bottom2D = Camera:WorldToViewportPoint(bottomWorld)
+                    local height = math.max(math.abs(top2D.Y - bottom2D.Y), 22)
+                    local width = math.max(height * 0.65, 14)
+                    local boxCenterX = pos.X
+                    local boxTopY = pos.Y - height/2
+
+                    if ESPBoxAktif then
+                        draw.Box.Size = Vector2.new(width, height)
+                        draw.Box.Position = Vector2.new(boxCenterX - width/2, boxTopY)
+                        draw.Box.Color = color
+                    end
+
+                    if ESPTracerAktif then
+                        draw.Line.From = Vector2.new(Camera.ViewportSize.X / 2, 0)
+                        draw.Line.To = Vector2.new(boxCenterX, boxTopY)
+                        draw.Line.Color = color
+                    end
+
+                    if ESPHealthAktif then
+                        local healthPct = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                        local barX = boxCenterX + width/2 + 4
+                        local barHeight = height * healthPct
+                        draw.Health.From = Vector2.new(barX, boxTopY + height)
+                        draw.Health.To = Vector2.new(barX, boxTopY + height - barHeight)
+                        draw.Health.Color = Color3.fromRGB(255 * (1-healthPct), 255 * healthPct, 0)
+                    end
+                else
+                    draw.Box.Visible = false
+                    draw.Line.Visible = false
+                    draw.Health.Visible = false
+                end
             end
 
-            data.TextLabel.Text = (model.Name or "Bot") .. (isShielded and " [KEBAL]" or "") .. " [" .. jarak .. "m]"
-            data.TextLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+            if ESPNamaAktif then
+                local playerName = Players:GetPlayerFromCharacter(model)
+                data.TextLabel.Text = (playerName and playerName.Name or model.Name).. (isShielded and " [KEBAL]" or "").. " [".. jarak.. "m]"
+            end
         end
     end
     for model, data in pairs(Active_ESP) do
@@ -888,6 +960,11 @@ RunService.RenderStepped:Connect(function()
             data.Highlight:Destroy()
             data.Gui:Destroy()
             Active_ESP[model] = nil
+        end
+    end
+    for model, data in pairs(ESP_Drawings) do
+        if not EntitiesInFrame[model] then
+            RemoveDrawingESP(model)
         end
     end
 end)
@@ -1125,4 +1202,3 @@ LoginTab:CreateParagraph({
     Title = "ℹ️ Informasi",
     Content = "Key VVIP didapat dari admin/registrator resmi. Device ID kamu terkirim otomatis saat proses login."
 })
-

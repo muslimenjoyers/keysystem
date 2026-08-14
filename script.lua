@@ -1864,23 +1864,11 @@ CreateToggle(
 local VisualFolder =
 	CreateSection("🎨 VISUAL FEATURES", VISUALPage)
 
-CreateToggle(
-	"🔴 Enable Chams",
-	"Chams",
-	VisualFolder
-)
+-- CreateToggle("🔴 Enable Chams", "Chams", VisualFolder)
 
-CreateToggle(
-	"🟢 Chams TEAM",
-	"ChamsTeam",
-	VisualFolder
-)
+-- CreateToggle("🟢 Chams TEAM", "ChamsTeam", VisualFolder)
 
-CreateToggle(
-	"🔴 Chams MUSUH",
-	"ChamsEnemy",
-	VisualFolder
-)
+-- CreateToggle("🔴 Chams MUSUH", "ChamsEnemy", VisualFolder)
 
 CreateToggle(
 	"⬜ Box",

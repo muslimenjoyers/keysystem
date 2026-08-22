@@ -140,6 +140,13 @@ ScreenGui.Parent = PlayerGui
 -- STATE
 --==================================================
 
+--==================================================
+-- SAVED TELEPORT LOCATIONS
+-- Synced from script lama11.txt
+--==================================================
+
+local SavedLocations = {}
+
 local State = {
 
 	-- AIM
@@ -164,8 +171,15 @@ ChamsTeam = false,
 ChamsEnemy = false,
 
 Box = false,
+Skeleton = false,
 Tracer = false,
 Health = false,
+
+-- STYLE ESP (synced from script lama10.txt)
+BoxStyle = "Corner Box",
+TracerOrigin = "Top",
+NameStyle = "Username",
+Target = "All",
 
 	-- PLAYER
 	NoFallDamage = false,
@@ -181,6 +195,9 @@ Health = false,
 
 	-- TELEPORT
 	TeleportToolAktif = false,
+
+	-- AUTO MACRO
+	AutoMacro = false,
 
 	-- CONFIG
 	AutoLoad = false,
@@ -599,6 +616,580 @@ local function VerifyKey(inputKey)
 
     return false, decoded.reason or "Key tidak valid.", nil
 end
+
+
+
+--==================================================
+-- AUTO MACRO
+-- Synced from script lama7.txt
+-- Flow:
+--   Shotgun/Sniper -> M-7 -> same weapon
+-- Trigger:
+--   Tool.Activated
+-- Safe guards:
+--   Character token, humanoid health, timeout, duplicate-run lock
+--==================================================
+
+local AutoMacroBusy = false
+local AutoMacroCharacterToken = 0
+
+local AutoMacroConnectedTools = {}
+local AutoMacroCharacterConnection = nil
+local AutoMacroBackpackAdded = nil
+local AutoMacroBackpackRemoved = nil
+
+local AUTO_MACRO_SWAP_TOOL = "M-7"
+
+local AUTO_MACRO_TO_M7_DELAY = 0.05
+local AUTO_MACRO_BACK_DELAY = 0.05
+
+local AUTO_MACRO_TOOL_TIMEOUT = 5
+local AUTO_MACRO_CHECK_INTERVAL = 0.05
+
+local AUTO_MACRO_WEAPONS = {
+	["870MCS"] = true,
+	["870MCS W"] = true,
+	["870MCS SILVER"] = true,
+
+	["M1887"] = true,
+	["M1887 W"] = true,
+	["M1887 SILVER"] = true,
+	["M1887 LIONHEART"] = true,
+	["M1887 BRAZUCA"] = true,
+	["M1887 PBNC5"] = true,
+
+	["SPAS15"] = true,
+	["SPAS15 BLUE DIAMOND"] = true,
+
+	["ZOMBIE SLAYER"] = true,
+
+	["SSG69"] = true,
+
+	["CHEYTAC M200"] = true,
+	["CHEYTAC M200 BLUE DIAMOND"] = true,
+	["CHEYTAC M200 TURKEY"] = true,
+	["CHEYTAC M200 BRAZUCA"] = true,
+	["CHEYTAC M200 DEMONIC"] = true,
+	["CHEYTAC M200 PBNC5"] = true,
+
+	["TACTILITE T2"] = true,
+	["TACTILITE T2 BLUE DIAMOND"] = true,
+	["TACTILITE T2 GREEN"] = true,
+	["TACTILITE T2 PEJUANG"] = true,
+
+	["PGM HECATE2"] = true,
+
+	["L115A1"] = true,
+	["L115A1 E-SPORT"] = true,
+	["BB L115A1 DRAGON"] = true,
+}
+
+local function AutoMacroDebug(...)
+	print("[VVIP MODS][AUTO MACRO]", ...)
+end
+
+local function AutoMacroGetBackpack()
+	local Backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
+
+	if Backpack then
+		return Backpack
+	end
+
+	return LocalPlayer:WaitForChild("Backpack", 10)
+end
+
+local function AutoMacroIsTool(Tool)
+	return Tool
+		and Tool:IsA("Tool")
+		and Tool.Parent ~= nil
+end
+
+local function AutoMacroFindTool(Name)
+	local Character = LocalPlayer.Character
+
+	if Character then
+		local Tool = Character:FindFirstChild(Name)
+
+		if AutoMacroIsTool(Tool) then
+			return Tool
+		end
+	end
+
+	local Backpack = AutoMacroGetBackpack()
+
+	if Backpack then
+		local Tool = Backpack:FindFirstChild(Name)
+
+		if AutoMacroIsTool(Tool) then
+			return Tool
+		end
+	end
+
+	return nil
+end
+
+local function AutoMacroWaitForTool(
+	Name,
+	ExpectedCharacter,
+	ExpectedToken,
+	Timeout
+)
+	local Start = os.clock()
+	Timeout = Timeout or AUTO_MACRO_TOOL_TIMEOUT
+
+	while os.clock() - Start < Timeout do
+		if not State.AutoMacro then
+			return nil
+		end
+
+		if ExpectedCharacter
+			and LocalPlayer.Character ~= ExpectedCharacter then
+			return nil
+		end
+
+		if ExpectedToken ~= AutoMacroCharacterToken then
+			return nil
+		end
+
+		local Tool = AutoMacroFindTool(Name)
+
+		if Tool then
+			return Tool
+		end
+
+		task.wait(AUTO_MACRO_CHECK_INTERVAL)
+	end
+
+	return nil
+end
+
+local function AutoMacroEquipTool(
+	Tool,
+	ExpectedCharacter,
+	ExpectedToken
+)
+	if not AutoMacroIsTool(Tool) then
+		return false
+	end
+
+	if not State.AutoMacro then
+		return false
+	end
+
+	if LocalPlayer.Character ~= ExpectedCharacter then
+		return false
+	end
+
+	if ExpectedToken ~= AutoMacroCharacterToken then
+		return false
+	end
+
+	local Humanoid =
+		ExpectedCharacter:FindFirstChildOfClass("Humanoid")
+
+	if not Humanoid then
+		return false
+	end
+
+	if Humanoid.Health <= 0 then
+		return false
+	end
+
+	local Backpack = AutoMacroGetBackpack()
+
+	if not Backpack then
+		return false
+	end
+
+	if Tool.Parent ~= ExpectedCharacter
+		and Tool.Parent ~= Backpack then
+		return false
+	end
+
+	if Tool.Parent == ExpectedCharacter then
+		return true
+	end
+
+	Humanoid:EquipTool(Tool)
+
+	for _ = 1, 50 do
+		task.wait(0.02)
+
+		if not State.AutoMacro then
+			return false
+		end
+
+		if LocalPlayer.Character ~= ExpectedCharacter then
+			return false
+		end
+
+		if ExpectedToken ~= AutoMacroCharacterToken then
+			return false
+		end
+
+		if Tool.Parent == ExpectedCharacter then
+			return true
+		end
+	end
+
+	return Tool.Parent == ExpectedCharacter
+end
+
+local function RunAutoMacro(Weapon)
+	if not State.AutoMacro then
+		return
+	end
+
+	if AutoMacroBusy then
+		return
+	end
+
+	if not AutoMacroIsTool(Weapon) then
+		return
+	end
+
+	if not AUTO_MACRO_WEAPONS[Weapon.Name] then
+		return
+	end
+
+	local Character = LocalPlayer.Character
+
+	if not Character then
+		return
+	end
+
+	-- Hanya berjalan ketika weapon sedang equipped.
+	if Weapon.Parent ~= Character then
+		return
+	end
+
+	local Humanoid =
+		Character:FindFirstChildOfClass("Humanoid")
+
+	if not Humanoid then
+		return
+	end
+
+	if Humanoid.Health <= 0 then
+		return
+	end
+
+	local MyCharacter = Character
+	local MyToken = AutoMacroCharacterToken
+	local WeaponName = Weapon.Name
+
+	AutoMacroBusy = true
+
+	AutoMacroDebug("START:", WeaponName)
+
+	task.spawn(function()
+		local function IsValid()
+			return State.AutoMacro
+				and MyToken == AutoMacroCharacterToken
+				and LocalPlayer.Character == MyCharacter
+				and MyCharacter.Parent ~= nil
+				and Humanoid.Health > 0
+		end
+
+		--==================================================
+		-- WEAPON -> M-7
+		--==================================================
+
+		task.wait(AUTO_MACRO_TO_M7_DELAY)
+
+		if not IsValid() then
+			AutoMacroBusy = false
+			return
+		end
+
+		local M7 =
+			AutoMacroWaitForTool(
+				AUTO_MACRO_SWAP_TOOL,
+				MyCharacter,
+				MyToken,
+				AUTO_MACRO_TOOL_TIMEOUT
+			)
+
+		if not M7 then
+			warn("[VVIP MODS][AUTO MACRO] M-7 tidak ditemukan")
+			AutoMacroBusy = false
+			return
+		end
+
+		if not AutoMacroEquipTool(
+			M7,
+			MyCharacter,
+			MyToken
+		) then
+			warn("[VVIP MODS][AUTO MACRO] Gagal equip M-7")
+			AutoMacroBusy = false
+			return
+		end
+
+		AutoMacroDebug("WEAPON -> M-7")
+
+		--==================================================
+		-- M-7 -> WEAPON
+		--==================================================
+
+		task.wait(AUTO_MACRO_BACK_DELAY)
+
+		if not IsValid() then
+			AutoMacroBusy = false
+			return
+		end
+
+		local CurrentWeapon =
+			AutoMacroWaitForTool(
+				WeaponName,
+				MyCharacter,
+				MyToken,
+				AUTO_MACRO_TOOL_TIMEOUT
+			)
+
+		if not CurrentWeapon then
+			warn(
+				"[VVIP MODS][AUTO MACRO] Weapon tidak ditemukan:",
+				WeaponName
+			)
+			AutoMacroBusy = false
+			return
+		end
+
+		if not AutoMacroEquipTool(
+			CurrentWeapon,
+			MyCharacter,
+			MyToken
+		) then
+			warn("[VVIP MODS][AUTO MACRO] Gagal kembali ke weapon")
+			AutoMacroBusy = false
+			return
+		end
+
+		AutoMacroDebug("M-7 ->", WeaponName)
+
+		AutoMacroBusy = false
+		AutoMacroDebug("SELESAI")
+	end)
+end
+
+local function AutoMacroDisconnectTool(Tool)
+	local Connection = AutoMacroConnectedTools[Tool]
+
+	if Connection then
+		Connection:Disconnect()
+		AutoMacroConnectedTools[Tool] = nil
+	end
+end
+
+local function AutoMacroDisconnectAllTools()
+	for Tool, Connection in pairs(AutoMacroConnectedTools) do
+		if Connection then
+			Connection:Disconnect()
+		end
+
+		AutoMacroConnectedTools[Tool] = nil
+	end
+end
+
+local function AutoMacroConnectWeapon(Tool)
+	if not Tool then
+		return
+	end
+
+	if not Tool:IsA("Tool") then
+		return
+	end
+
+	if not AUTO_MACRO_WEAPONS[Tool.Name] then
+		return
+	end
+
+	if AutoMacroConnectedTools[Tool] then
+		return
+	end
+
+	AutoMacroConnectedTools[Tool] =
+		Tool.Activated:Connect(function()
+			if not State.AutoMacro then
+				return
+			end
+
+			if Tool.Parent ~= LocalPlayer.Character then
+				return
+			end
+
+			-- Jalankan setelah Activated selesai.
+			task.defer(function()
+				if not State.AutoMacro then
+					return
+				end
+
+				if Tool.Parent == LocalPlayer.Character then
+					RunAutoMacro(Tool)
+				end
+			end)
+		end)
+
+	AutoMacroDebug("CONNECTED:", Tool.Name)
+end
+
+local function AutoMacroScanTools()
+	if not State.AutoMacro then
+		return
+	end
+
+	local Character = LocalPlayer.Character
+
+	if Character then
+		for _, Child in ipairs(Character:GetChildren()) do
+			if Child:IsA("Tool")
+				and AUTO_MACRO_WEAPONS[Child.Name] then
+				AutoMacroConnectWeapon(Child)
+			end
+		end
+	end
+
+	local Backpack = AutoMacroGetBackpack()
+
+	if Backpack then
+		for _, Child in ipairs(Backpack:GetChildren()) do
+			if Child:IsA("Tool")
+				and AUTO_MACRO_WEAPONS[Child.Name] then
+				AutoMacroConnectWeapon(Child)
+			end
+		end
+	end
+
+	for Tool in pairs(AutoMacroConnectedTools) do
+		if not Tool.Parent then
+			AutoMacroDisconnectTool(Tool)
+		elseif not AUTO_MACRO_WEAPONS[Tool.Name] then
+			AutoMacroDisconnectTool(Tool)
+		end
+	end
+end
+
+local function AutoMacroWatchBackpack(Backpack)
+	if AutoMacroBackpackAdded then
+		AutoMacroBackpackAdded:Disconnect()
+		AutoMacroBackpackAdded = nil
+	end
+
+	if AutoMacroBackpackRemoved then
+		AutoMacroBackpackRemoved:Disconnect()
+		AutoMacroBackpackRemoved = nil
+	end
+
+	if not Backpack then
+		return
+	end
+
+	AutoMacroBackpackAdded =
+		Backpack.ChildAdded:Connect(function(Child)
+			if Child:IsA("Tool") then
+				task.defer(function()
+					AutoMacroConnectWeapon(Child)
+					AutoMacroScanTools()
+				end)
+			end
+		end)
+
+	AutoMacroBackpackRemoved =
+		Backpack.ChildRemoved:Connect(function(Child)
+			if Child:IsA("Tool") then
+				task.defer(AutoMacroScanTools)
+			end
+		end)
+
+	AutoMacroScanTools()
+end
+
+local function AutoMacroWatchCharacter(Character)
+	if AutoMacroCharacterConnection then
+		AutoMacroCharacterConnection:Disconnect()
+		AutoMacroCharacterConnection = nil
+	end
+
+	if not Character then
+		return
+	end
+
+	AutoMacroCharacterConnection =
+		Character.ChildAdded:Connect(function(Child)
+			if Child:IsA("Tool") then
+				task.defer(function()
+					AutoMacroConnectWeapon(Child)
+					AutoMacroScanTools()
+				end)
+			end
+		end)
+
+	AutoMacroScanTools()
+end
+
+local function AutoMacroInitializeCharacter(Character)
+	if not Character then
+		return
+	end
+
+	AutoMacroCharacterToken += 1
+	AutoMacroBusy = false
+
+	local Humanoid =
+		Character:WaitForChild("Humanoid", 10)
+
+	if not Humanoid then
+		return
+	end
+
+	AutoMacroWatchBackpack(
+		LocalPlayer:FindFirstChildOfClass("Backpack")
+			or LocalPlayer:WaitForChild("Backpack", 10)
+	)
+
+	AutoMacroWatchCharacter(Character)
+
+	task.spawn(function()
+		for _ = 1, 50 do
+			if LocalPlayer.Character ~= Character then
+				return
+			end
+
+			AutoMacroScanTools()
+			task.wait(0.1)
+		end
+	end)
+end
+
+LocalPlayer.CharacterAdded:Connect(function(Character)
+	AutoMacroInitializeCharacter(Character)
+end)
+
+if LocalPlayer.Character then
+	task.spawn(function()
+		AutoMacroInitializeCharacter(LocalPlayer.Character)
+	end)
+end
+
+task.spawn(function()
+	local LastBackpack = nil
+
+	while LocalPlayer.Parent do
+		local Backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
+
+		if Backpack ~= LastBackpack then
+			LastBackpack = Backpack
+
+			if Backpack then
+				AutoMacroWatchBackpack(Backpack)
+			end
+		end
+
+		AutoMacroScanTools()
+		task.wait(0.25)
+	end
+end)
 
 
 --==================================================
@@ -1877,6 +2468,12 @@ CreateToggle(
 )
 
 CreateToggle(
+	"🦴 Skeleton",
+	"Skeleton",
+	VisualFolder
+)
+
+CreateToggle(
 	"📍 Tracer",
 	"Tracer",
 	VisualFolder
@@ -1885,6 +2482,38 @@ CreateToggle(
 CreateToggle(
 	"❤️ Health Bar",
 	"Health",
+	VisualFolder
+)
+ 
+--==================================================
+-- STYLE ESP (synced from script lama10.txt)
+--==================================================
+
+CreateDropdown(
+	"📦 Box Style",
+	"BoxStyle",
+	{"Box","Corner Box","3D Box"},
+	VisualFolder
+)
+
+CreateDropdown(
+	"📍 Tracer Origin",
+	"TracerOrigin",
+	{"Bottom","Center","Top"},
+	VisualFolder
+)
+
+CreateDropdown(
+	"📝 Name Style",
+	"NameStyle",
+	{"Display Name","Username","Name + Username","Hide"},
+	VisualFolder
+)
+
+CreateDropdown(
+	"🎯 ESP Target",
+	"Target",
+	{"All","Enemy","Team"},
 	VisualFolder
 )
 
@@ -1947,12 +2576,75 @@ CreateSlider(
 -- PLAYER TAB
 --==================================================
 
+local PlayerFolder =
+	CreateSection("🏃 PLAYER FEATURES", PLAYERPage)
+
+CreateToggle(
+	"🛡️ No Fall Damage",
+	"NoFallDamage",
+	PlayerFolder
+)
+
+CreateToggle(
+	"⚡ Kecepatan Lari",
+	"Speed",
+	PlayerFolder
+)
+
+CreateSlider(
+	"⚙️ Set Speed",
+	"SpeedValue",
+	16,
+	250,
+	PlayerFolder
+)
+
+CreateToggle(
+	"🚀 Lompat Tinggi",
+	"Jump",
+	PlayerFolder
+)
+
+CreateSlider(
+	"⚙️ Set Jump Power",
+	"JumpValue",
+	50,
+	250,
+	PlayerFolder
+)
+
+CreateToggle(
+	"🪽 Fly Mode",
+	"Fly",
+	PlayerFolder
+)
+
+CreateSlider(
+	"⚙️ Kecepatan Fly",
+	"FlySpeed",
+	10,
+	300,
+	PlayerFolder
+)
+
+CreateToggle(
+	"👻 Noclip",
+	"Noclip",
+	PlayerFolder
+)
+
+CreateToggle(
+	"🔄 Auto Macro",
+	"AutoMacro",
+	PlayerFolder
+)
+
 --==================================================
 -- TELEPORT
 -- Synced from script lama.txt.
 --==================================================
 
-local TeleportFolder = CreateSection("📍 TELEPORT", PLAYERPage, true)
+local TeleportFolder = CreateSection("📍 TELEPORT KE PLAYER", PLAYERPage)
 local Mouse = LocalPlayer:GetMouse()
 
 local function NotifyTeleport(Text)
@@ -2018,6 +2710,338 @@ CreateButton("📍 TP Ke Posisi Mouse", TeleportFolder, function()
 	end
 end)
 
+--==================================================
+-- SAVED LOCATIONS TELEPORT
+-- Synced from script lama11.txt
+--==================================================
+
+local TeleportFolder2 = CreateSection("📍 TELEPORT KE LOKASI TERSIMPAN", PLAYERPage)
+
+local SavedLocationNameBox = Instance.new("TextBox")
+SavedLocationNameBox.Name = "SavedLocationNameBox"
+SavedLocationNameBox.Size = UDim2.new(1, 0, 0, 42)
+SavedLocationNameBox.BackgroundColor3 = COLORS.Control
+SavedLocationNameBox.TextColor3 = COLORS.Text
+SavedLocationNameBox.PlaceholderColor3 = COLORS.SubText
+SavedLocationNameBox.PlaceholderText = "Nama lokasi..."
+SavedLocationNameBox.Text = ""
+SavedLocationNameBox.TextSize = 12
+SavedLocationNameBox.Font = Enum.Font.Gotham
+SavedLocationNameBox.ClearTextOnFocus = false
+SavedLocationNameBox.ZIndex = 103
+SavedLocationNameBox.Parent = TeleportFolder2
+
+local SavedLocationNameCorner = Instance.new("UICorner")
+SavedLocationNameCorner.CornerRadius = UDim.new(0, 8)
+SavedLocationNameCorner.Parent = SavedLocationNameBox
+
+local SavedLocationNamePadding = Instance.new("UIPadding")
+SavedLocationNamePadding.PaddingLeft = UDim.new(0, 12)
+SavedLocationNamePadding.PaddingRight = UDim.new(0, 12)
+SavedLocationNamePadding.Parent = SavedLocationNameBox
+
+local RefreshSavedLocations
+
+local SaveLocationButton =
+	CreateButton(
+		"💾 SAVE CURRENT LOCATION",
+		TeleportFolder2,
+		function()
+
+			local Character = LocalPlayer.Character
+			local HRP =
+				Character
+				and Character:FindFirstChild("HumanoidRootPart")
+
+			if not Character or not HRP then
+				NotifyTeleport("❌ Karakter belum siap")
+				return
+			end
+
+			local LocationName =
+				SavedLocationNameBox.Text
+
+			if LocationName == "" then
+				LocationName =
+					"Location "
+					.. (#SavedLocations + 1)
+			end
+
+			table.insert(
+				SavedLocations,
+				{
+					Name = LocationName,
+					Position = HRP.Position
+				}
+			)
+
+			SavedLocationNameBox.Text = ""
+
+			NotifyTeleport(
+				"✅ Lokasi tersimpan: "
+				.. LocationName
+			)
+
+			RefreshSavedLocations()
+		end
+	)
+
+local SavedLocationList =
+	Instance.new("ScrollingFrame")
+
+SavedLocationList.Name =
+	"SavedLocationList"
+
+SavedLocationList.Size =
+	UDim2.new(1, 0, 0, 180)
+
+SavedLocationList.BackgroundColor3 =
+	COLORS.Background
+
+SavedLocationList.BackgroundTransparency =
+	0.15
+
+SavedLocationList.BorderSizePixel = 0
+
+SavedLocationList.ScrollBarThickness = 4
+
+SavedLocationList.ScrollBarImageColor3 =
+	COLORS.Border
+
+SavedLocationList.CanvasSize =
+	UDim2.fromOffset(0, 0)
+
+SavedLocationList.AutomaticCanvasSize =
+	Enum.AutomaticSize.Y
+
+SavedLocationList.ZIndex = 103
+SavedLocationList.Parent =
+	TeleportFolder2
+
+local SavedLocationListCorner =
+	Instance.new("UICorner")
+
+SavedLocationListCorner.CornerRadius =
+	UDim.new(0, 8)
+
+SavedLocationListCorner.Parent =
+	SavedLocationList
+
+local SavedLocationListLayout =
+	Instance.new("UIListLayout")
+
+SavedLocationListLayout.Padding =
+	UDim.new(0, 5)
+
+SavedLocationListLayout.SortOrder =
+	Enum.SortOrder.LayoutOrder
+
+SavedLocationListLayout.Parent =
+	SavedLocationList
+
+local SavedLocationListPadding =
+	Instance.new("UIPadding")
+
+SavedLocationListPadding.PaddingTop =
+	UDim.new(0, 6)
+
+SavedLocationListPadding.PaddingBottom =
+	UDim.new(0, 6)
+
+SavedLocationListPadding.PaddingLeft =
+	UDim.new(0, 6)
+
+SavedLocationListPadding.PaddingRight =
+	UDim.new(0, 6)
+
+SavedLocationListPadding.Parent =
+	SavedLocationList
+
+local function TeleportToSavedLocation(Position)
+
+	local Character =
+		LocalPlayer.Character
+
+	if not Character then
+		NotifyTeleport(
+			"❌ Karakter belum siap"
+		)
+		return
+	end
+
+	local HRP =
+		Character:FindFirstChild(
+			"HumanoidRootPart"
+		)
+
+	if not HRP then
+		NotifyTeleport(
+			"❌ HumanoidRootPart tidak ditemukan"
+		)
+		return
+	end
+
+	Character:PivotTo(
+		CFrame.new(
+			Position
+			+ Vector3.new(0, 3, 0)
+		)
+	)
+
+	NotifyTeleport(
+		"✅ Teleport ke lokasi tersimpan"
+	)
+end
+
+local function ClearSavedLocationList()
+
+	for _, Child in
+		ipairs(
+			SavedLocationList:GetChildren()
+		) do
+
+		if Child:IsA("Frame") then
+			Child:Destroy()
+		end
+
+	end
+
+end
+
+RefreshSavedLocations = function()
+
+	ClearSavedLocationList()
+
+	for Index, Location in
+		ipairs(SavedLocations) do
+
+		local Item =
+			Instance.new("Frame")
+
+		Item.Name =
+			"SavedLocation_" .. Index
+
+		Item.Size =
+			UDim2.new(1, 0, 0, 44)
+
+		Item.BackgroundColor3 =
+			COLORS.Control
+
+		Item.BorderSizePixel = 0
+		Item.LayoutOrder = Index
+		Item.ZIndex = 104
+		Item.Parent =
+			SavedLocationList
+
+		local ItemCorner =
+			Instance.new("UICorner")
+
+		ItemCorner.CornerRadius =
+			UDim.new(0, 7)
+
+		ItemCorner.Parent = Item
+
+		local TeleportButton =
+			Instance.new("TextButton")
+
+		TeleportButton.Name =
+			"Teleport"
+
+		TeleportButton.Size =
+			UDim2.new(1, -50, 1, 0)
+
+		TeleportButton.BackgroundTransparency =
+			1
+
+		TeleportButton.Text =
+			"📍 " .. Location.Name
+
+		TeleportButton.TextColor3 =
+			COLORS.Text
+
+		TeleportButton.TextSize = 11
+		TeleportButton.Font =
+			Enum.Font.GothamMedium
+
+		TeleportButton.TextXAlignment =
+			Enum.TextXAlignment.Left
+
+		TeleportButton.ZIndex = 105
+		TeleportButton.Parent = Item
+
+		local ButtonPadding =
+			Instance.new("UIPadding")
+
+		ButtonPadding.PaddingLeft =
+			UDim.new(0, 10)
+
+		ButtonPadding.Parent =
+			TeleportButton
+
+		TeleportButton.Activated:Connect(
+			function()
+
+				TeleportToSavedLocation(
+					Location.Position
+				)
+
+			end
+		)
+
+		local DeleteButton =
+			Instance.new("TextButton")
+
+		DeleteButton.Name = "Delete"
+
+		DeleteButton.Size =
+			UDim2.fromOffset(34, 34)
+
+		DeleteButton.Position =
+			UDim2.new(1, -39, 0.5, -17)
+
+		DeleteButton.BackgroundColor3 =
+			COLORS.Off
+
+		DeleteButton.Text = "×"
+
+		DeleteButton.TextColor3 =
+			COLORS.Text
+
+		DeleteButton.TextSize = 15
+		DeleteButton.Font =
+			Enum.Font.GothamBold
+
+		DeleteButton.ZIndex = 106
+		DeleteButton.Parent = Item
+
+		local DeleteCorner =
+			Instance.new("UICorner")
+
+		DeleteCorner.CornerRadius =
+			UDim.new(0, 7)
+
+		DeleteCorner.Parent =
+			DeleteButton
+
+		DeleteButton.Activated:Connect(
+			function()
+
+				table.remove(
+					SavedLocations,
+					Index
+				)
+
+				RefreshSavedLocations()
+
+			end
+		)
+
+	end
+
+end
+
+RefreshSavedLocations()
+
 local function BuildTeleportLists()
 	local TeamList = {"Pilih Teman"}
 	local EnemyList = {"Pilih Musuh"}
@@ -2043,63 +3067,6 @@ Players.PlayerAdded:Connect(function() task.wait(0.5); BuildTeleportLists() end)
 Players.PlayerRemoving:Connect(function() task.defer(BuildTeleportLists) end)
 LocalPlayer:GetPropertyChangedSignal("TeamColor"):Connect(BuildTeleportLists)
 LocalPlayer:GetPropertyChangedSignal("Team"):Connect(BuildTeleportLists)
-
-local PlayerFolder =
-	CreateSection("🏃 PLAYER FEATURES", PLAYERPage)
-
-CreateToggle(
-	"🛡️ No Fall Damage",
-	"NoFallDamage",
-	PlayerFolder
-)
-
-CreateToggle(
-	"⚡ Kecepatan Lari",
-	"Speed",
-	PlayerFolder
-)
-
-CreateSlider(
-	"⚙️ Set Speed",
-	"SpeedValue",
-	16,
-	250,
-	PlayerFolder
-)
-
-CreateToggle(
-	"🚀 Lompat Tinggi",
-	"Jump",
-	PlayerFolder
-)
-
-CreateSlider(
-	"⚙️ Set Jump Power",
-	"JumpValue",
-	50,
-	250,
-	PlayerFolder
-)
-
-CreateToggle(
-	"🪽 Fly Mode",
-	"Fly",
-	PlayerFolder
-)
-
-CreateSlider(
-	"⚙️ Kecepatan Fly",
-	"FlySpeed",
-	10,
-	300,
-	PlayerFolder
-)
-
-CreateToggle(
-	"👻 Noclip",
-	"Noclip",
-	PlayerFolder
-)
 
 -- Apply side effects when UI state changes.
 
@@ -2162,8 +3129,13 @@ ChamsTeam = State.ChamsTeam,
 ChamsEnemy = State.ChamsEnemy,
 
 Box = State.Box,
+Skeleton = State.Skeleton,
 Tracer = State.Tracer,
 Health = State.Health,
+BoxStyle = State.BoxStyle,
+TracerOrigin = State.TracerOrigin,
+NameStyle = State.NameStyle,
+Target = State.Target,
 
 Speed = State.Speed,
 SpeedValue = State.SpeedValue,
@@ -2176,6 +3148,8 @@ FlySpeed = State.FlySpeed,
 
 Noclip = State.Noclip,
 NoFallDamage = State.NoFallDamage,
+
+		AutoMacro = State.AutoMacro,
 
 		AutoLoad = State.AutoLoad,
 	}
@@ -2399,8 +3373,13 @@ State.ChamsTeam = true
 State.ChamsEnemy = true
 
 State.Box = false
+State.Skeleton = false
 State.Tracer = false
 State.Health = false
+State.BoxStyle = "Corner Box"
+State.TracerOrigin = "Top"
+State.NameStyle = "Username"
+State.Target = "All"
 
 -- PLAYER DEFAULT
 State.NoFallDamage = false
@@ -2415,6 +3394,8 @@ State.Fly = false
 State.FlySpeed = 50
 
 State.Noclip = false
+
+	State.AutoMacro = true
 
 	State.AutoLoad = false
 
@@ -3043,7 +4024,8 @@ local function CreateESP(Player)
 	Icon.AnchorPoint =
 		Vector2.new(0.5,0.5)
 
-	Icon.BackgroundTransparency = 1
+	Icon.BackgroundColor3 = Color3.fromRGB(0,0,0)
+    Icon.BackgroundTransparency = 0
 
 	Icon.Image =
 		"https://www.roblox.com/headshot-thumbnail/image?userId="
@@ -3087,10 +4069,14 @@ local function CreateESP(Player)
 		"[0m]"
 
 	Distance.TextColor3 =
-		COLORS.Text
+	COLORS.Text
 
-	Distance.TextStrokeTransparency =
-		0.2
+    -- STROKE HITAM DISTANCE
+    local DistanceStroke = Instance.new("UIStroke")
+    DistanceStroke.Color = Color3.fromRGB(0,0,0)
+    DistanceStroke.Thickness = 2
+    DistanceStroke.Transparency = 0
+    DistanceStroke.Parent = Distance
 
 	Distance.Font =
 		Enum.Font.GothamBold
@@ -3120,9 +4106,13 @@ local function CreateESP(Player)
 
 	NameLabel.TextColor3 =
 		COLORS.Text
-
-	NameLabel.TextStrokeTransparency =
-		0.2
+		
+	-- STROKE HITAM NAME
+    local NameStroke = Instance.new("UIStroke")
+    NameStroke.Color = Color3.fromRGB(0,0,0)
+    NameStroke.Thickness = 2
+    NameStroke.Transparency = 0
+    NameStroke.Parent = NameLabel
 
 	NameLabel.Font =
 		Enum.Font.GothamBold
@@ -3159,6 +4149,21 @@ local function CreateESP(Player)
 	Arrow.ZIndex = 12
 	Arrow.Parent = Container
 
+	-- SKELETON
+	local Skeleton = {}
+	for Index = 1,15 do
+		local Line = Instance.new("Frame")
+		Line.Name = "SkeletonLine" .. Index
+		Line.AnchorPoint = Vector2.new(0.5,0.5)
+		Line.BackgroundColor3 = COLORS.Enemy
+		Line.BorderSizePixel = 0
+		Line.Size = UDim2.fromOffset(0,2)
+		Line.Visible = false
+		Line.ZIndex = 55
+		Line.Parent = ScreenGui
+		Skeleton[Index] = Line
+	end
+
 	-- BOX
 	local Box =
 		Instance.new("Frame")
@@ -3178,10 +4183,55 @@ local function CreateESP(Player)
 		ScreenGui
 
 	local BoxStroke =
-		Instance.new("UIStroke")
+	Instance.new("UIStroke")
 
-	BoxStroke.Thickness = 2
-	BoxStroke.Parent = Box
+    BoxStroke.Color = COLORS.Enemy
+    BoxStroke.Thickness = 2
+    BoxStroke.Transparency = 0
+    BoxStroke.Parent = Box
+
+	-- STYLE BOX LINES (Corner / 3D)
+	local BoxCornerLines = {}
+	for Index = 1,8 do
+		local Line = Instance.new("Frame")
+		Line.Name = "BoxCornerLine" .. Index
+		Line.AnchorPoint = Vector2.new(0.5,0.5)
+		Line.BackgroundColor3 = COLORS.Enemy
+		Line.BorderSizePixel = 0
+		Line.Size = UDim2.fromOffset(0,2)
+		
+		local Stroke = Instance.new("UIStroke")
+        Stroke.Color = Color3.fromRGB(0,0,0)
+        Stroke.Thickness = 1
+        Stroke.Transparency = 0
+        Stroke.Parent = Line
+		
+		Line.Visible = false
+		Line.ZIndex = 9
+		Line.Parent = ScreenGui
+		BoxCornerLines[Index] = Line
+	end
+
+	local Box3DLines = {}
+	for Index = 1,12 do
+		local Line = Instance.new("Frame")
+		Line.Name = "Box3DLine" .. Index
+		Line.AnchorPoint = Vector2.new(0.5,0.5)
+		Line.BackgroundColor3 = COLORS.Enemy
+		Line.BorderSizePixel = 0
+		Line.Size = UDim2.fromOffset(0,2)
+		
+		local Stroke = Instance.new("UIStroke")
+        Stroke.Color = Color3.fromRGB(0,0,0)
+        Stroke.Thickness = 1
+        Stroke.Transparency = 0
+        Stroke.Parent = Line
+		
+		Line.Visible = false
+		Line.ZIndex = 9
+		Line.Parent = ScreenGui
+		Box3DLines[Index] = Line
+	end
 
 	-- TRACER
 	local Tracer =
@@ -3215,6 +4265,13 @@ local function CreateESP(Player)
 		Color3.fromRGB(30,30,30)
 
 	HealthBack.BorderSizePixel = 0
+	
+	-- STROKE HITAM HEALTH
+	local HealthStroke = Instance.new("UIStroke")
+    HealthStroke.Color = Color3.fromRGB(0,0,0)
+    HealthStroke.Thickness = 2
+    HealthStroke.Transparency = 0
+    HealthStroke.Parent = HealthBack
 
 	HealthBack.Visible = false
 	HealthBack.ZIndex = 9
@@ -3255,8 +4312,12 @@ local function CreateESP(Player)
 		Name = NameLabel,
 		Arrow = Arrow,
 
+		Skeleton = Skeleton,
+
 		Box = Box,
 		BoxStroke = BoxStroke,
+		BoxCornerLines = BoxCornerLines,
+		Box3DLines = Box3DLines,
 
 		Tracer = Tracer,
 
@@ -3373,6 +4434,128 @@ local function SetTracer(
 		Color
 
 	Frame.Visible = true
+end
+
+--==================================================
+-- SKELETON DRAWING
+--==================================================
+
+local function SetSkeletonLine(Line, From, To, Color)
+	local Delta = To - From
+	local Length = Delta.Magnitude
+	if Length < 1 then Line.Visible = false return end
+	Line.Position = UDim2.fromOffset((From.X + To.X) / 2, (From.Y + To.Y) / 2)
+	Line.Size = UDim2.fromOffset(Length, 2)
+	Line.Rotation = math.deg(math.atan2(Delta.Y, Delta.X))
+	Line.BackgroundColor3 = Color
+	Line.Visible = true
+end
+
+local function DrawSkeleton(Data, Character, Humanoid, Color)
+	for _, Line in ipairs(Data.Skeleton) do Line.Visible = false end
+	if not State.Skeleton or not Camera then return end
+	local Connections
+	if Humanoid.RigType == Enum.HumanoidRigType.R6 then
+		Connections = {{"Head","Torso"},{"Torso","Left Arm"},{"Torso","Right Arm"},{"Torso","Left Leg"},{"Torso","Right Leg"}}
+	else
+		Connections = {{"Head","UpperTorso"},{"UpperTorso","LowerTorso"},{"UpperTorso","LeftUpperArm"},{"LeftUpperArm","LeftLowerArm"},{"LeftLowerArm","LeftHand"},{"UpperTorso","RightUpperArm"},{"RightUpperArm","RightLowerArm"},{"RightLowerArm","RightHand"},{"LowerTorso","LeftUpperLeg"},{"LeftUpperLeg","LeftLowerLeg"},{"LeftLowerLeg","LeftFoot"},{"LowerTorso","RightUpperLeg"},{"RightUpperLeg","RightLowerLeg"},{"RightLowerLeg","RightFoot"}}
+	end
+	local Index = 1
+	for _, Connection in ipairs(Connections) do
+		local A = Character:FindFirstChild(Connection[1], true)
+		local B = Character:FindFirstChild(Connection[2], true)
+		if A and B and A:IsA("BasePart") and B:IsA("BasePart") then
+			local SA = Camera:WorldToViewportPoint(A.Position)
+			local SB = Camera:WorldToViewportPoint(B.Position)
+			if SA.Z > 0 and SB.Z > 0 and Data.Skeleton[Index] then
+				SetSkeletonLine(Data.Skeleton[Index], Vector2.new(SA.X,SA.Y), Vector2.new(SB.X,SB.Y), Color)
+				Index += 1
+			end
+		end
+	end
+end
+
+--==================================================
+-- STYLE ESP DRAWING
+--==================================================
+
+local function HideBoxStyleLines(Data)
+	for _,Line in ipairs(Data.BoxCornerLines or {}) do
+		Line.Visible = false
+	end
+	for _,Line in ipairs(Data.Box3DLines or {}) do
+		Line.Visible = false
+	end
+end
+
+local function SetStyleLine(Line, From, To, Color)
+	local Delta = To - From
+	local Length = Delta.Magnitude
+	if Length < 1 then
+		Line.Visible = false
+		return
+	end
+	Line.Position = UDim2.fromOffset((From.X + To.X)/2, (From.Y + To.Y)/2)
+	Line.Size = UDim2.fromOffset(Length, 2)
+	Line.Rotation = math.deg(math.atan2(Delta.Y, Delta.X))
+	Line.BackgroundColor3 = Color
+	Line.Visible = true
+end
+
+local function DrawStyleBox(Data, X, Y, Width, Height, Color)
+	HideBoxStyleLines(Data)
+	Data.Box.Visible = false
+
+	if State.BoxStyle == "Corner Box" then
+		local CW = math.max(8, math.floor(Width * 0.25))
+		local CH = math.max(8, math.floor(Height * 0.20))
+		local parts = {
+			{Vector2.new(X,Y), Vector2.new(X+CW,Y)},
+			{Vector2.new(X,Y), Vector2.new(X,Y+CH)},
+			{Vector2.new(X+Width-CW,Y), Vector2.new(X+Width,Y)},
+			{Vector2.new(X+Width,Y), Vector2.new(X+Width,Y+CH)},
+			{Vector2.new(X,Y+Height-CH), Vector2.new(X,Y+Height)},
+			{Vector2.new(X,Y+Height), Vector2.new(X+CW,Y+Height)},
+			{Vector2.new(X+Width-CW,Y+Height), Vector2.new(X+Width,Y+Height)},
+			{Vector2.new(X+Width,Y+Height-CH), Vector2.new(X+Width,Y+Height)},
+		}
+		for Index,Part in ipairs(parts) do
+			SetStyleLine(Data.BoxCornerLines[Index], Part[1], Part[2], Color)
+		end
+		return
+	end
+
+	if State.BoxStyle == "3D Box" then
+		local OX = math.clamp(Width * 0.18, 10, 32)
+		local OY = math.clamp(Height * 0.10, 8, 28)
+		local F = {
+			Vector2.new(X,Y), Vector2.new(X+Width,Y),
+			Vector2.new(X+Width,Y+Height), Vector2.new(X,Y+Height),
+		}
+		local B = {
+			F[1] + Vector2.new(OX,-OY), F[2] + Vector2.new(OX,-OY),
+			F[3] + Vector2.new(OX,-OY), F[4] + Vector2.new(OX,-OY),
+		}
+		local Edges = {
+			{F[1],F[2]},{F[2],F[3]},{F[3],F[4]},{F[4],F[1]},
+			{B[1],B[2]},{B[2],B[3]},{B[3],B[4]},{B[4],B[1]},
+			{F[1],B[1]},{F[2],B[2]},{F[3],B[3]},{F[4],B[4]},
+		}
+		for Index,Edge in ipairs(Edges) do
+			SetStyleLine(Data.Box3DLines[Index], Edge[1], Edge[2], Color)
+		end
+		return
+	end
+
+	-- BOX
+	Data.Box.AnchorPoint = Vector2.new(0.5,0.5)
+	Data.Box.Position = UDim2.fromOffset(X + Width/2, Y + Height/2)
+	Data.Box.Size = UDim2.fromOffset(Width, Height)
+	Data.Box.BackgroundTransparency = 1
+	Data.BoxStroke.Color = Color
+	Data.BoxStroke.Thickness = 2
+	Data.BoxStroke.Transparency = 0
+	Data.Box.Visible = true
 end
 
 --==================================================
@@ -3716,9 +4899,11 @@ RunService.RenderStepped:Connect(function()
 			Data.Container.Visible = false
 			Data.Tracer.Visible = false
 			Data.Box.Visible = false
+			HideBoxStyleLines(Data)
 			Data.HealthBack.Visible = false
 			Data.Name.Visible = false
 			Data.Distance.Visible = false
+			for _, Line in ipairs(Data.Skeleton) do Line.Visible = false end
 
 		end
 
@@ -3763,9 +4948,11 @@ RunService.RenderStepped:Connect(function()
 			Data.Container.Visible = false
 			Data.Tracer.Visible = false
 			Data.Box.Visible = false
+			HideBoxStyleLines(Data)
 			Data.Distance.Visible = false
 			Data.Name.Visible = false
 			Data.HealthBack.Visible = false
+			for _, Line in ipairs(Data.Skeleton) do Line.Visible = false end
 
 			if TargetCharacter then
 				RemoveChams(TargetCharacter)
@@ -3780,6 +4967,12 @@ RunService.RenderStepped:Connect(function()
 
 local ESPEnabled =
 	IsESPEnabledForPlayer(Player)
+
+if State.Target == "Enemy" then
+	ESPEnabled = not (LocalPlayer.Team and Player.Team and LocalPlayer.Team == Player.Team)
+elseif State.Target == "Team" then
+	ESPEnabled = (LocalPlayer.Team and Player.Team and LocalPlayer.Team == Player.Team) == true
+end
 
 if not ESPEnabled then
 
@@ -3808,6 +5001,8 @@ end
 
 		local Color =
 			GetTeamColor(Player)
+
+		DrawSkeleton(Data, TargetCharacter, Humanoid, Color)
 
 --================================================
 -- CHAMS TEAM / ENEMY
@@ -4010,13 +5205,19 @@ end
 		--================================================
 
 		if State.NameDistance
+			and State.NameStyle ~= "Hide"
 			and OnScreen
 			and ValidScreen then
 
 			Data.Name.Visible = true
 
-			Data.Name.Text =
-				Player.Name
+			if State.NameStyle == "Display Name" then
+				Data.Name.Text = Player.DisplayName
+			elseif State.NameStyle == "Name + Username" then
+				Data.Name.Text = Player.DisplayName .. " (" .. Player.Name .. ")"
+			else
+				Data.Name.Text = Player.Name
+			end
 
 			Data.Name.TextColor3 =
 				Color
@@ -4112,28 +5313,14 @@ end
 						Bottom2D.Y
 					) / 2
 
-				Data.Box.AnchorPoint =
-					Vector2.new(
-						0.5,
-						0.5
-					)
-
-				Data.Box.Position =
-					UDim2.fromOffset(
-						BoxCenterX,
-						BoxCenterY
-					)
-
-				Data.Box.Size =
-					UDim2.fromOffset(
-						Width,
-						Height
-					)
-
-				Data.BoxStroke.Color =
+				DrawStyleBox(
+					Data,
+					BoxCenterX - Width/2,
+					BoxCenterY - Height/2,
+					Width,
+					Height,
 					Color
-
-				Data.Box.Visible = true
+				)
 
 				if State.NameDistance then
 
@@ -4238,42 +5425,47 @@ end
 		else
 
 			Data.Box.Visible = false
+			HideBoxStyleLines(Data)
 			Data.HealthBack.Visible = false
 
 		end
 
 		--================================================
-		-- TRACER
-		--================================================
+-- TRACER
+--================================================
 
-		if State.Tracer
-			and OnScreen
-			and ValidScreen then
+if State.Tracer
+    and OnScreen
+    and ValidScreen then
 
-			local From =
-				Vector2.new(
-					Viewport.X / 2,
-					2
-				)
+    local From
 
-			local To =
-				Vector2.new(
-					ScreenPosition.X,
-					ScreenPosition.Y
-				)
+    if State.TracerOrigin == "Bottom" then
+        From = Vector2.new(Viewport.X / 2, Viewport.Y - 2)
+    elseif State.TracerOrigin == "Center" then
+        From = Vector2.new(Viewport.X / 2, Viewport.Y / 2)
+    else
+        From = Vector2.new(Viewport.X / 2, 2)
+    end
 
-			SetTracer(
-				Data.Tracer,
-				From,
-				To,
-				Color
-			)
+    local To =
+    Vector2.new(
+        ScreenPosition.X,
+        ScreenPosition.Y - 90
+    )
 
-		else
+    SetTracer(
+        Data.Tracer,
+        From,
+        To,
+        Color
+    )
 
-			Data.Tracer.Visible = false
+else
 
-		end
+    Data.Tracer.Visible = false
+
+end
 
 	end
 
@@ -4284,7 +5476,7 @@ end)
 --==================================================
 
 CurrentTab =
-	TabData["AIM"]
+	TabData["ESP"]
 
 CurrentTab.Page.Visible = true
 CurrentTab.Button.BackgroundColor3 =
@@ -4296,6 +5488,6 @@ CurrentTab.Button.BackgroundColor3 =
 
 print("====================================")
 print("VVIP MODS GUI LOADED")
-print("AIM + ESP + VISUAL + CONFIG")
+print("AIM + ESP + VISUAL + AUTO MACRO + CONFIG")
 print("ROBLOX STUDIO / OWN GAME")
-print("====================================")
+print("====================================")   
